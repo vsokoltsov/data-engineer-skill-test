@@ -1,12 +1,12 @@
 from pipelines.db.models import Transaction
 
-from typing import Any, Iterable, Sequence, Dict
-from uuid import UUID
+from typing import Any, Sequence, Dict, cast
 
 from dataclasses import dataclass
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.engine import CursorResult
+
 
 @dataclass
 class TransactionRepository:
@@ -29,5 +29,5 @@ class TransactionRepository:
                 "category": stmt.excluded.category,
             },
         )
-        res = await self.session.execute(stmt)
+        res = cast(CursorResult[Any], await self.session.execute(stmt))
         return int(res.rowcount or 0)

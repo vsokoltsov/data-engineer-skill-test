@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pandas as pd
 from typing import Iterator
 
+
 @dataclass
 class CSVReader:
     file_path: str
@@ -17,5 +18,14 @@ class CSVReader:
             chunksize=chunk_size,
         ):
             chunk["id"] = chunk["id"].map(lambda x: str(uuid.UUID(int=x)))
-            chunk['timestamp'] = chunk['timestamp'].map(lambda x: x.isoformat())
-            yield chunk    
+            chunk["timestamp"] = chunk["timestamp"].map(lambda x: x.isoformat())
+            if "merchant" in chunk.columns:
+                chunk["merchant"] = (
+                    chunk["merchant"]
+                    .astype(str)
+                    .str.strip()
+                    .replace({"": None, "nan": None})
+                )
+            else:
+                chunk["merchant"] = None
+            yield chunk

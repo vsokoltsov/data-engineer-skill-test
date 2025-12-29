@@ -3,6 +3,7 @@ import requests
 
 from pipelines.services.ml_api import MLPredictService
 
+
 class DummyResponse:
     def __init__(self, status_code=200, json_data=None, headers=None):
         self.status_code = status_code
@@ -26,7 +27,12 @@ class TestMLPredictService:
             calls["n"] += 1
             return DummyResponse(
                 status_code=200,
-                json_data=[{"transaction_id": "00000000-0000-0000-0000-000000000001", "category": "Food"}],
+                json_data=[
+                    {
+                        "transaction_id": "00000000-0000-0000-0000-000000000001",
+                        "category": "Food",
+                    }
+                ],
             )
 
         monkeypatch.setattr(requests, "post", fake_post)
@@ -35,8 +41,12 @@ class TestMLPredictService:
         out = svc.predict(trx=[])
 
         assert calls["n"] == 1
-        assert out == [{"transaction_id": "00000000-0000-0000-0000-000000000001", "category": "Food"}]
-
+        assert out == [
+            {
+                "transaction_id": "00000000-0000-0000-0000-000000000001",
+                "category": "Food",
+            }
+        ]
 
     def test_predict_retries_on_503_then_success(self, monkeypatch):
         # 503 -> 503 -> 200
@@ -45,7 +55,12 @@ class TestMLPredictService:
             DummyResponse(status_code=503),
             DummyResponse(
                 status_code=200,
-                json_data=[{"transaction_id": "00000000-0000-0000-0000-000000000002", "category": "Travel"}],
+                json_data=[
+                    {
+                        "transaction_id": "00000000-0000-0000-0000-000000000002",
+                        "category": "Travel",
+                    }
+                ],
             ),
         ]
         calls = {"n": 0}
@@ -68,8 +83,12 @@ class TestMLPredictService:
         assert calls["n"] == 3
         # Было 2 ретрая => 2 sleep
         assert len(sleeps) == 2
-        assert out == [{"transaction_id": "00000000-0000-0000-0000-000000000002", "category": "Travel"}]
-
+        assert out == [
+            {
+                "transaction_id": "00000000-0000-0000-0000-000000000002",
+                "category": "Travel",
+            }
+        ]
 
     def test_predict_uses_retry_after_header(self, monkeypatch):
         # 429 с Retry-After -> потом успех
@@ -77,7 +96,12 @@ class TestMLPredictService:
             DummyResponse(status_code=429, headers={"Retry-After": "2"}),
             DummyResponse(
                 status_code=200,
-                json_data=[{"transaction_id": "00000000-0000-0000-0000-000000000003", "category": "Rent"}],
+                json_data=[
+                    {
+                        "transaction_id": "00000000-0000-0000-0000-000000000003",
+                        "category": "Rent",
+                    }
+                ],
             ),
         ]
 
@@ -98,7 +122,6 @@ class TestMLPredictService:
         assert sleeps == [2.0]  # использовали Retry-After
         assert out[0]["category"] == "Rent"
 
-
     def test_predict_raises_after_max_retries_on_status(self, monkeypatch):
         # Всегда 503 -> должно упасть после max_retries
         def fake_post(url, json):
@@ -112,9 +135,19 @@ class TestMLPredictService:
         with pytest.raises(requests.HTTPError):
             svc.predict(trx=[])
 
-
     def test_predict_retries_on_timeout_then_success(self, monkeypatch):
-        seq = [requests.Timeout("timeout"), DummyResponse(status_code=200, json_data=[{"transaction_id": "00000000-0000-0000-0000-000000000004", "category": "Food"}])]
+        seq = [
+            requests.Timeout("timeout"),
+            DummyResponse(
+                status_code=200,
+                json_data=[
+                    {
+                        "transaction_id": "00000000-0000-0000-0000-000000000004",
+                        "category": "Food",
+                    }
+                ],
+            ),
+        ]
         calls = {"n": 0}
         sleeps = []
 
@@ -134,7 +167,6 @@ class TestMLPredictService:
         assert calls["n"] == 2
         assert len(sleeps) == 1
         assert out[0]["category"] == "Food"
-
 
     def test_post_builds_correct_url(self, monkeypatch):
         captured = {}

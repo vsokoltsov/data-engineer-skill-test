@@ -1,9 +1,7 @@
 import os
 import asyncio
-import pandas as pd
 from pathlib import Path
 from pipelines.csv.reader import CSVReader
-from pipelines.db.repository import TransactionRepository
 from pipelines.services.csv import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -12,6 +10,7 @@ DATABASE_URL = "postgresql+asyncpg://app:app@localhost:5432/transactions"
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
+
 
 async def main():
     ROOT = Path(__file__).parent.parent.parent
@@ -30,7 +29,6 @@ async def main():
     rows = await service.run()
     print("Rows inserted: ", rows)
 
-if __name__ == '__main__':
-    asyncio.run(main())
 
-        
+if __name__ == "__main__":
+    asyncio.run(main())
