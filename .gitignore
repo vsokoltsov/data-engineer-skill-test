@@ -1,0 +1,12 @@
+# MacOS
+.DS_Store
+
+# Virtual environment
+.venv
+.virtualenv
+
+# Misc
+.cadence
+
+# Python
+__pycache__

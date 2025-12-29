@@ -1,0 +1,31 @@
+# Test your FastAPI endpoints
+
+GET http://127.0.0.1:8000/
+Accept: application/json
+
+###
+
+GET http://127.0.0.1:8000/hello/User
+Accept: application/json
+
+###
+
+
+POST http://localhost:8000/predict
+Content-Type: application/json
+
+[
+  {
+  "id": "c9fa6684-502b-4695-8f92-247431ba610d",
+  "description": "Weekly grocery shopping at Whole Foods",
+  "amount": 100,
+  "timestamp": "2023-04-15T14:30:00",
+  "merchant": "Whole Foods Market",
+  "operation_type": "card_payment",
+  "side": "credit"
+  }
+]
+
+###
+
+

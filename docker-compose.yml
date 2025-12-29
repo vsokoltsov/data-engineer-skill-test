@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  ml-api:
+    build:
+      context: ml_api
+      dockerfile: Dockerfile
+    container_name: ml-api-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml_api/:/app
+    command:
+      python -m src.main
+    networks:
+      - ml-network
+networks:
+  ml-network:
+    driver: bridge
