@@ -1,30 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from uuid import UUID
-from datetime import datetime
 from urllib.parse import urljoin
 
 import requests
-from pydantic import BaseModel
 from typing import List
 
-import requests
 
 from pipelines.services.backoff import retry_with_backoff
-
-class PredictionResponse(BaseModel):
-    transaction_id: UUID
-    category: str
-
-
-class TransactionRequest(BaseModel):
-    id: UUID
-    description: str
-    amount: float
-    timestamp: datetime
-    merchant: str | None
-    operation_type: str
-    side: str
+from pipelines.services.models import TransactionRequest, PredictionResponse
 
 
 @dataclass

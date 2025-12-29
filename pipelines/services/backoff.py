@@ -18,7 +18,10 @@ def retry_with_backoff(
     max_delay_s: float = 10.0,
     jitter: bool = True,
     retry_statuses: Iterable[int] = (429, 500, 502, 503, 504),
-    retry_exceptions: tuple[type[BaseException], ...] = (requests.Timeout, requests.ConnectionError),
+    retry_exceptions: tuple[type[BaseException], ...] = (
+        requests.Timeout,
+        requests.ConnectionError,
+    ),
 ) -> Callable[[Callable[P, requests.Response]], Callable[P, requests.Response]]:
     retry_statuses_set = set(retry_statuses)
 
@@ -89,7 +92,7 @@ def _sleep_backoff(
         time.sleep(override)
         return
 
-    delay = min(base_delay_s * (2 ** attempt), max_delay_s)
+    delay = min(base_delay_s * (2**attempt), max_delay_s)
     if jitter:
         delay *= random.uniform(0.7, 1.3)
     time.sleep(delay)
