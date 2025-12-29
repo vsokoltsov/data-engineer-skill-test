@@ -2,9 +2,10 @@ import os
 import asyncio
 import pandas as pd
 from pathlib import Path
-from pipelines.csv.reader import read_transactions
-from pipelines.external.ml import MLPredictService, TransactionRequest
+from pipelines.csv.reader import CSVReader
 from pipelines.db.repository import TransactionRepository
+from pipelines.services.csv import CSVTransactionIngestService
+from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 DATABASE_URL = "postgresql+asyncpg://app:app@localhost:5432/transactions"
@@ -14,25 +15,20 @@ SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 async def main():
     ROOT = Path(__file__).parent.parent.parent
-    ml_api = MLPredictService(url="http://localhost:8000")
     trx_path = os.path.join(ROOT, "data", "transactions_fr.csv")
-    async with SessionFactory() as session:
-        repo = TransactionRepository(session)
-        for chunk in read_transactions(path=trx_path, chunk_size=1000):
-            trx = chunk.to_dict(orient='records')
-            predictions = ml_api.predict(trx)
-            df_pred = pd.DataFrame(predictions)
-            df = chunk.merge(
-                df_pred,
-                left_on="id",
-                right_on="transaction_id",
-                how="left",
-                validate="one_to_one"
-            ).drop(columns=["transaction_id"])
-            df['timestamp'] = pd.to_datetime(df["timestamp"], errors="raise")
-            rows_affected = await repo.upsert_many(df.to_dict(orient='records'))
-            await session.commit()
-    print("Rows inserted: ", rows_affected)
+
+    ml_api = MLPredictService(url="http://localhost:8000")
+    reader = CSVReader(file_path=trx_path)
+    engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    service = CSVTransactionIngestService(
+        session_factory=session_factory,
+        ml_api=ml_api,
+        csv_reader=reader,
+    )
+
+    rows = await service.run()
+    print("Rows inserted: ", rows)
 
 if __name__ == '__main__':
     asyncio.run(main())
