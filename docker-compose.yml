@@ -14,6 +14,55 @@ services:
       python -m src.main
     networks:
       - ml-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: transactions
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d transactions"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - ml-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    depends_on:
+      - postgres
+    # ВАЖНО: чтобы это было "без авторизации", держим только на localhost
+    ports:
+      - "127.0.0.1:5050:80"
+    environment:
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+
+      PGADMIN_DEFAULT_EMAIL: "admin@example.com"
+      PGADMIN_DEFAULT_PASSWORD: "admin"
+
+      # Автоподхват заранее описанного сервера
+      PGADMIN_CONFIG_LOAD_SERVERS_FROM_JSON: "True"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./infra/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./infra/pgadmin/pgpass:/pgpass:ro
+    networks:
+      - ml-network
+
+
+volumes:
+  pg_data:
+  pgadmin-data:
+
 networks:
   ml-network:
     driver: bridge
