@@ -12,6 +12,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class Base(DeclarativeBase):
     pass
 
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
@@ -27,7 +28,7 @@ class Transaction(Base):
 
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
-    merchant: Mapped[str] = mapped_column(String(255), nullable=False)
+    merchant: Mapped[str] = mapped_column(String(255), nullable=True)
     operation_type: Mapped[str] = mapped_column(String(64), nullable=False)
     side: Mapped[str] = mapped_column(String(16), nullable=False)
 
