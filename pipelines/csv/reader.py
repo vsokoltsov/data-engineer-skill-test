@@ -1,3 +1,4 @@
+import uuid
 import pandas as pd
 from typing import Iterator
 
@@ -10,5 +11,6 @@ def read_transactions(path: str, chunk_size: int = 1000) -> Iterator[pd.DataFram
         parse_dates=["timestamp"],
         chunksize=chunk_size,
     ):
-        chunk["id"] = chunk["id"].astype(str)
+        chunk["id"] = chunk["id"].map(lambda x: str(uuid.UUID(int=x)))
+        chunk['timestamp'] = chunk['timestamp'].map(lambda x: x.isoformat())
         yield chunk
