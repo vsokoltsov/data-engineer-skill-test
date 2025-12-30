@@ -16,5 +16,8 @@ unit-tests:
 integration-tests:
 	uv run pytest -m integration
 
+e2e-tests:
+	uv run pytest -m e2e
+
 test-coverage:
 	uv run pytest -q --cov=pipelines --cov-report=term-missing
