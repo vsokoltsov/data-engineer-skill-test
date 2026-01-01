@@ -11,7 +11,7 @@ ruff:
 	ruff check pipelines/ tests/ --fix
 
 lint:
-	make mypy & make black & make ruff
+	make mypy & make black-fix & make ruff
 
 unit-tests:
 	uv run pytest -m unit
