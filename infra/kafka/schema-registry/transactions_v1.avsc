@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "Transaction",
+  "namespace": "com.example",
+  "fields": [
+    { "name": "id", "type": "string" },
+    { "name": "description", "type": "string" },
+    { "name": "amount", "type": "double" },
+    { "name": "timestamp", "type": "string" },
+
+    { "name": "merchant", "type": ["null", "string"], "default": null },
+
+    { "name": "operation_type", "type": "string" },
+    { "name": "side", "type": "string" },
+
+    { "name": "category", "type": ["null", "string"], "default": null }
+  ]
+}
