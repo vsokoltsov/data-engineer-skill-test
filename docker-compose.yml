@@ -13,6 +13,11 @@ services:
       python -m src.main
     networks:
       - ml-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://ml-api:8000/health', timeout=2)\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   postgres:
     image: postgres:16-alpine
@@ -208,6 +213,28 @@ services:
       kafka:
         condition: service_healthy
       schema-registry:
+        condition: service_healthy
+      postgres: 
+        condition: service_healthy
+      ml-api:
+        condition: service_healthy
+
+  csv-ingest:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    volumes:
+      - ./data:/app/data
+      - ./pipelines:/app/pipelines
+      - ./alembic.ini:/app/alembic.ini
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.csv.main"]
+    networks:
+      - ml-network
+    depends_on:
+      postgres: 
+        condition: service_healthy
+      ml-api:
         condition: service_healthy
 
 volumes:
