@@ -5,7 +5,6 @@ services:
     build:
       context: ml_api
       dockerfile: Dockerfile
-    container_name: ml-api-service
     ports:
       - "8000:8000"
     volumes:
@@ -17,7 +16,6 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: postgres
     environment:
       POSTGRES_DB: transactions
       POSTGRES_USER: app
@@ -36,7 +34,6 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: pgadmin
     depends_on:
       - postgres
     # ВАЖНО: чтобы это было "без авторизации", держим только на localhost
@@ -58,6 +55,160 @@ services:
     networks:
       - ml-network
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - ml-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - zookeeper
+    ports:
+      # внутри docker-сети брокер доступен как kafka:9092
+      - "9092:9092"
+      # с хоста удобно ходить на 29092
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+
+      # listeners
+      KAFKA_LISTENERS: "INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: "INTERNAL://kafka:9092,EXTERNAL://localhost:29092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "INTERNAL"
+
+      # single-node dev settings
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - ml-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+      init-topics:
+        condition: service_completed_successfully
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+
+      # ВАЖНО: указываем кафку внутри docker-сети
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka:9092"
+
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: "_schemas"
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+
+      # API
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/subjects >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - ml-network
+
+  console:
+    image: redpandadata/console:latest
+    depends_on:
+      - kafka
+      - schema-registry
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BROKERS: "kafka:9092"
+      SCHEMAREGISTRY_ENABLED: "true"
+      SCHEMAREGISTRY_URLS: "http://schema-registry:8081"
+    networks:
+      - ml-network
+
+  init-topics:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - kafka
+    volumes:
+      - ./infra/kafka/scripts/init-kafka-topics.sh:/scripts/init-kafka-topics.sh:ro
+    entrypoint: ["/bin/bash", "/scripts/init-kafka-topics.sh"]
+    networks:
+      - ml-network
+
+  register-schemas:
+    image: curlimages/curl:8.7.1
+    depends_on:
+      schema-registry:
+        condition: service_healthy
+      init-topics:
+        condition: service_completed_successfully
+    volumes:
+      - ./infra/kafka/schema-registry/transactions_v1.avsc:/schemas/transactions_v1.avsc:ro
+      - ./infra/kafka/scripts/register-schemas.sh:/scripts/register-schemas.sh:ro
+    entrypoint: ["/bin/sh", "/scripts/register-schemas.sh"]
+    networks:
+      - ml-network
+
+  producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: producer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      TOPIC_NAME: "transactions"
+      CSV_PATH: "/data/transactions_fr.csv"
+    volumes:
+      - ./pipelines:/app/pipelines
+      - ./data:/app/data
+      - ./alembic.ini:/app/alembic.ini
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.kafka.producer.main"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    networks:
+      - ml-network
+
+  consumer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: consumer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      TOPIC_NAME: "transactions"
+      GROUP_ID: "transactions-consumer"
+    volumes:
+      - ./pipelines:/app/pipelines
+      - ./alembic.ini:/app/alembic.ini
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.kafka.consumer.main"]
+    networks:
+      - ml-network
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
 
 volumes:
   pg_data:
