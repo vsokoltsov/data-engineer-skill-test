@@ -10,6 +10,9 @@ black-fix:
 ruff:
 	ruff check pipelines/ tests/ --fix
 
+lint:
+	make mypy & make black & make ruff
+
 unit-tests:
 	uv run pytest -m unit
 
