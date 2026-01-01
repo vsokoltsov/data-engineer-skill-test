@@ -15,12 +15,14 @@ dependencies = [
     "requests>=2.32.5",
     "sqlalchemy[asyncio]>=2.0.45",
     "testcontainers[postgresql]>=4.13.3",
+    "types-requests>=2.32.4.20250913",
 ]
 
 [dependency-groups]
 dev = [
     "black>=25.12.0",
     "httpx>=0.28.1",
+    "kafka-python>=2.3.0",
     "mypy>=1.19.1",
     "pandas-stubs>=2.3.3.251219",
     "pytest>=9.0.2",
@@ -32,6 +34,14 @@ dev = [
 [tool.mypy]
 [[tool.mypy.overrides]]
 module = "testcontainers.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "aiokafka.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "kafka.*"
 ignore_missing_imports = true
 
 [tool.pyright]
