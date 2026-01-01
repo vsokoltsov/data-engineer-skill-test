@@ -23,18 +23,23 @@ class AbstractTransactionIngestService(ABC):
     def read_batches(self, chunk_size: int = 1000) -> AsyncIterator[pd.DataFrame]: ...
 
     async def run(self) -> int:
+        # Run pipeline
+
         total_rows = 0
 
         async with self.session_factory() as session:
             repo = TransactionRepository(session=session)
 
+            # 1. Read source in batches
             async for chunk in self.read_batches(chunk_size=1000):
                 trx = cast(List[TransactionRequest], chunk.to_dict(orient="records"))
+                # 2. Retrieve predictions for each batch
                 predictions: List[PredictionResponse] = self.ml_api.predict(trx)
                 df = merge_predictions(chunk=chunk, predictions=predictions)
                 affected = await repo.upsert_many(
                     cast(List[Dict[str, Any]], df.to_dict(orient="records"))
                 )
+                # 3. Save transaction data + predicted category to database
                 await session.commit()
                 total_rows += affected
         return total_rows
@@ -58,7 +63,6 @@ class KafkaTransactionIngestService(AbstractTransactionIngestService):
             await self.consumer.getmany(timeout_ms=1000, max_records=1000)
         )
         for _, records in batches.items():
-            print("CONSUMER RECORDS", records)
             if records:
                 chunk = pd.DataFrame([r.value for r in records])
                 yield chunk

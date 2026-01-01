@@ -10,7 +10,7 @@ from testcontainers.postgres import PostgresContainer
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from pipelines.services.csv import CSVTransactionIngestService
+from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.csv.reader import CSVReader
 from pipelines.services.models import TransactionRequest, PredictionResponse
 from pipelines.db.models import Base, Transaction

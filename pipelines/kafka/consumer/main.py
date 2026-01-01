@@ -9,7 +9,7 @@ from datetime import datetime
 from aiokafka import AIOKafkaConsumer
 from pipelines.services.ml_api import MLPredictService
 from pipelines.db.repository import TransactionRepository
-from pipelines.services.csv import KafkaTransactionIngestService
+from pipelines.services.batch_ingest import KafkaTransactionIngestService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 DATABASE_URL = "postgresql+asyncpg://app:app@postgres:5432/transactions"

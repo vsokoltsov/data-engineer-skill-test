@@ -2,7 +2,7 @@ import os
 import asyncio
 from pathlib import Path
 from pipelines.csv.reader import CSVReader
-from pipelines.services.csv import CSVTransactionIngestService
+from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 

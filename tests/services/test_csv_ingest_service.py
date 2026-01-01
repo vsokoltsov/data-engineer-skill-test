@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import Mock, AsyncMock, call
 
-from pipelines.services.csv import CSVTransactionIngestService
+from pipelines.services.batch_ingest import CSVTransactionIngestService
 
 
 @pytest.mark.asyncio
@@ -40,7 +40,7 @@ class TestCSVTransactionIngestService:
 
         merge_predictions_mock = Mock(side_effect=[merged_df1, merged_df2])
         monkeypatch.setattr(
-            "pipelines.services.csv.merge_predictions",
+            "pipelines.services.batch_ingest.merge_predictions",
             merge_predictions_mock,
         )
 
@@ -50,7 +50,7 @@ class TestCSVTransactionIngestService:
 
         # Patch TransactionRepository constructor to return our repo mock
         monkeypatch.setattr(
-            "pipelines.services.csv.TransactionRepository",
+            "pipelines.services.batch_ingest.TransactionRepository",
             Mock(return_value=repo),
         )
 
@@ -111,7 +111,7 @@ class TestCSVTransactionIngestService:
         repo.upsert_many = AsyncMock()
 
         monkeypatch.setattr(
-            "pipelines.services.csv.TransactionRepository",
+            "pipelines.services.batch_ingest.TransactionRepository",
             Mock(return_value=repo),
         )
 
@@ -150,7 +150,7 @@ class TestCSVTransactionIngestService:
         # merge should not be called due to predict error
         merge_predictions_mock = Mock()
         monkeypatch.setattr(
-            "pipelines.services.csv.merge_predictions",
+            "pipelines.services.batch_ingest.merge_predictions",
             merge_predictions_mock,
         )
 
@@ -158,7 +158,7 @@ class TestCSVTransactionIngestService:
         repo.upsert_many = AsyncMock()
 
         monkeypatch.setattr(
-            "pipelines.services.csv.TransactionRepository",
+            "pipelines.services.batch_ingest.TransactionRepository",
             Mock(return_value=repo),
         )
 
@@ -200,7 +200,7 @@ class TestCSVTransactionIngestService:
 
         merge_predictions_mock = Mock(return_value=merged_df)
         monkeypatch.setattr(
-            "pipelines.services.csv.merge_predictions",
+            "pipelines.services.batch_ingest.merge_predictions",
             merge_predictions_mock,
         )
 
@@ -208,7 +208,7 @@ class TestCSVTransactionIngestService:
         repo.upsert_many = AsyncMock(side_effect=RuntimeError("db error"))
 
         monkeypatch.setattr(
-            "pipelines.services.csv.TransactionRepository",
+            "pipelines.services.batch_ingest.TransactionRepository",
             Mock(return_value=repo),
         )
 
