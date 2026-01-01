@@ -16,7 +16,7 @@ COMPOSE_FILE = os.path.join(Path(__file__).resolve().parents[2], "docker-compose
 TOPIC = "transactions"
 BOOTSTRAP = "localhost:29092"
 PG_DSN = "dbname=transactions user=app password=app host=localhost port=5432"
-DETACHED = os.getenv('DETACHED', False)
+DETACHED = os.getenv("DETACHED", False)
 
 
 def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
@@ -30,26 +30,29 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 
 @pytest.mark.e2e
 def test_consumer_entrypoint_inserts_rows():
-    subprocess.check_call([
-        "docker",
-        "compose",
-        "-f",
-        str(COMPOSE_FILE),
-        "up",
-        "-d",
-        "--build",
-        "postgres",
-        "kafka",
-        "zookeeper",
-        "schema-registry",
-        "init-topics",
-        "register-schemas",
-        "consumer", 
-        "ml-api",
-    ])
+    subprocess.check_call(
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(COMPOSE_FILE),
+            "up",
+            "-d",
+            "--build",
+            "postgres",
+            "kafka",
+            "zookeeper",
+            "schema-registry",
+            "init-topics",
+            "register-schemas",
+            "consumer",
+            "ml-api",
+        ]
+    )
 
     try:
         producer = KafkaProducer(bootstrap_servers=BOOTSTRAP)
+
         def pg_ready():
             try:
                 conn = psycopg2.connect(PG_DSN)
@@ -69,7 +72,11 @@ def test_consumer_entrypoint_inserts_rows():
                         return False
                     return row[0] is not None
 
-        wait_until(table_exists, timeout=90, err="transactions table not created (alembic not applied)")
+        wait_until(
+            table_exists,
+            timeout=90,
+            err="transactions table not created (alembic not applied)",
+        )
 
         with psycopg2.connect(PG_DSN) as conn:
             with conn.cursor() as cur:
@@ -116,7 +123,9 @@ def test_consumer_entrypoint_inserts_rows():
         ]
 
         for msg in payloads:
-            producer.send(TOPIC, value=json.dumps(msg).encode("utf-8"))  # <-- см. ниже про JSON
+            producer.send(
+                TOPIC, value=json.dumps(msg).encode("utf-8")
+            )  # <-- см. ниже про JSON
         producer.flush()
 
         def rows_inserted():
@@ -126,7 +135,7 @@ def test_consumer_entrypoint_inserts_rows():
                     row = cur.fetchone()
                     if not row:
                         return False
-                    qresult = row.get('c', 0)
+                    qresult = row.get("c", 0)
                     return qresult >= 2
 
         wait_until(rows_inserted, timeout=60, err="Rows were not inserted")
@@ -156,4 +165,6 @@ def test_consumer_entrypoint_inserts_rows():
 
     finally:
         if not DETACHED:
-            subprocess.call(["docker", "compose", "-f", str(COMPOSE_FILE), "down", "-v"])
+            subprocess.call(
+                ["docker", "compose", "-f", str(COMPOSE_FILE), "down", "-v"]
+            )

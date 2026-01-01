@@ -1,7 +1,6 @@
 import asyncio
 from uuid import UUID
 import json
-import os
 from typing import Any, Dict
 from pydantic import BaseModel
 from datetime import datetime
@@ -11,8 +10,13 @@ from pipelines.services.ml_api import MLPredictService
 from pipelines.db.repository import TransactionRepository
 from pipelines.services.batch_ingest import KafkaTransactionIngestService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-
-DATABASE_URL = "postgresql+asyncpg://app:app@postgres:5432/transactions"
+from pipelines.config import (
+    DATABASE_URL,
+    ML_API_URL,
+    KAFKA_BOOTSTRAP_SERVERS,
+    TOPIC_NAME,
+    GROUP_ID,
+)
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
@@ -39,19 +43,15 @@ async def handle(
 
 
 async def main() -> None:
-    bootstrap = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
-    topic = os.environ.get("TOPIC_NAME", "transactions")
-    group_id = os.environ.get("GROUP_ID", "transactions-consumer")
-
     consumer = AIOKafkaConsumer(
-        topic,
-        bootstrap_servers=bootstrap,
-        group_id=group_id,
+        TOPIC_NAME,
+        bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+        group_id=GROUP_ID,
         auto_offset_reset="earliest",
         enable_auto_commit=False,
         value_deserializer=json_deserializer,
     )
-    ml_api = MLPredictService(url="http://ml-api:8000")
+    ml_api = MLPredictService(url=ML_API_URL)
     engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     service = KafkaTransactionIngestService(

@@ -1,23 +1,17 @@
-import os
 import asyncio
-from pathlib import Path
 from pipelines.csv.reader import CSVReader
 from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-
-DATABASE_URL = "postgresql+asyncpg://app:app@localhost:5432/transactions"
+from pipelines.config import DATABASE_URL, TRANSACTIONS_PATH, ML_API_URL
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def main():
-    ROOT = Path(__file__).parent.parent.parent
-    trx_path = os.path.join(ROOT, "data", "transactions_fr.csv")
-
-    ml_api = MLPredictService(url="http://localhost:8000")
-    reader = CSVReader(file_path=trx_path)
+    ml_api = MLPredictService(url=ML_API_URL)
+    reader = CSVReader(file_path=TRANSACTIONS_PATH)
     engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     service = CSVTransactionIngestService(
