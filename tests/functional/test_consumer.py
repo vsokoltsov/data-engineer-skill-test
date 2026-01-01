@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from kafka import KafkaProducer  # pip install kafka-python
+from kafka import KafkaProducer
 
 
 COMPOSE_FILE = os.path.join(Path(__file__).resolve().parents[2], "docker-compose.yml")
@@ -30,7 +30,6 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 
 @pytest.mark.e2e
 def test_consumer_entrypoint_inserts_rows():
-    # 1) поднимаем compose
     subprocess.check_call([
         "docker",
         "compose",
