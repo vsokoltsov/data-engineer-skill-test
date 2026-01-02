@@ -28,7 +28,7 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
     raise AssertionError(err)
 
 
-@pytest.mark.e2e
+@pytest.mark.functional
 def test_consumer_entrypoint_inserts_rows():
     subprocess.check_call(
         [

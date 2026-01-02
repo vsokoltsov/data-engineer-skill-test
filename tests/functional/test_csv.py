@@ -28,7 +28,7 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
     raise AssertionError(err)
 
 
-@pytest.mark.e2e
+@pytest.mark.functional
 def test_csv_entrypoint_inserts_rows():
     trx_file_path = os.path.join(DATA_PATH, "dumb_csv.csv")
     trx_container_path = os.path.join("/app", "data", "dumb_csv.csv")

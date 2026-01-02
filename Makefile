@@ -23,7 +23,7 @@ e2e-tests:
 	uv run pytest -m e2e
 
 test-coverage:
-	uv run pytest -q --cov=pipelines --cov-report=term-missing
+	uv run pytest -q --cov=pipelines --cov-report=term-missing -m "not functional"
 
 csv-ingestion:
 	docker-compose up postgres ml-api csv-ingestion
