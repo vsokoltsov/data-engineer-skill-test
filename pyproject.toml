@@ -8,6 +8,7 @@ dependencies = [
     "aiokafka>=0.12.0",
     "alembic>=1.17.2",
     "asyncpg>=0.31.0",
+    "dotenv>=0.9.9",
     "fastapi>=0.128.0",
     "pandas>=2.3.3",
     "prometheus-client>=0.23.1",
