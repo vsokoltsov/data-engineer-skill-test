@@ -1,0 +1,116 @@
+{
+    "uid": "ingest-observability",
+    "title": "Ingest Observability",
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "tags": ["ingest", "prometheus"],
+    "templating": {
+      "list": [
+        {
+          "name": "job",
+          "type": "query",
+          "datasource": "prometheus",
+          "refresh": 1,
+          "query": "label_values(up, job)",
+          "current": { "selected": true, "text": "consumer", "value": "consumer" }
+        },
+        {
+          "name": "source",
+          "type": "custom",
+          "options": [
+            { "selected": true, "text": "kafka", "value": "kafka" },
+            { "selected": false, "text": "csv", "value": "csv" }
+          ],
+          "current": { "selected": true, "text": "kafka", "value": "kafka" }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "type": "stat",
+        "title": "Target up",
+        "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          { "refId": "A", "expr": "up{job=\"$job\"}", "legendFormat": "up" }
+        ]
+      },
+      {
+        "type": "stat",
+        "title": "In-flight (0/1)",
+        "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+        "targets": [
+          { "refId": "A", "expr": "ingest_inflight{source=\"$source\"}", "legendFormat": "inflight" }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Rows processed / sec",
+        "gridPos": { "x": 0, "y": 4, "w": 12, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "rate(ingest_rows_total{source=\"$source\"}[5m])",
+            "legendFormat": "rows_in"
+          },
+          {
+            "refId": "B",
+            "expr": "rate(ingest_rows_written_total{source=\"$source\"}[5m])",
+            "legendFormat": "rows_written"
+          }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Errors / sec by stage",
+        "gridPos": { "x": 0, "y": 10, "w": 12, "h": 6 },
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum by (stage) (rate(ingest_errors_total{source=\"$source\"}[5m]))",
+            "legendFormat": "{{stage}}"
+          }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Latency p95 (predict / db / commit)",
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 7 },
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(ingest_stage_duration_seconds_bucket{source=\"$source\",stage=\"predict\"}[5m])))",
+            "legendFormat": "predict p95"
+          },
+          {
+            "refId": "B",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(ingest_stage_duration_seconds_bucket{source=\"$source\",stage=\"db_upsert\"}[5m])))",
+            "legendFormat": "db_upsert p95"
+          },
+          {
+            "refId": "C",
+            "expr": "histogram_quantile(0.95, sum by (le) (rate(ingest_stage_duration_seconds_bucket{source=\"$source\",stage=\"commit\"}[5m])))",
+            "legendFormat": "commit p95"
+          }
+        ]
+      },
+      {
+        "type": "timeseries",
+        "title": "Kafka activity (records/sec, empty polls/sec)",
+        "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "sum(rate(kafka_records_polled_total[5m]))",
+            "legendFormat": "records/sec"
+          },
+          {
+            "refId": "B",
+            "expr": "sum(rate(kafka_poll_empty_total[5m]))",
+            "legendFormat": "empty_polls/sec"
+          }
+        ]
+      }
+    ]
+  }
