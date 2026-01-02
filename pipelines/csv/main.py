@@ -6,7 +6,13 @@ from pipelines.csv.reader import CSVReader
 from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from pipelines.config import DATABASE_URL, TRANSACTIONS_PATH, ML_API_URL
+from pipelines.config import (
+    DATABASE_URL,
+    TRANSACTIONS_PATH,
+    ML_API_URL,
+    OBS_HOST,
+    OBS_PORT
+)
 from pipelines.observability.http_app import (
     HealthState,
     create_app,
@@ -14,12 +20,14 @@ from pipelines.observability.http_app import (
     stop_uvicorn,
 )
 from pipelines.logging import setup_logging
+from dotenv import load_dotenv
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
 
 async def main():
+    load_dotenv()
     setup_logging("csv-ingest")
     logging = structlog.get_logger().bind(service="csv-ingest")
 
@@ -27,8 +35,8 @@ async def main():
     app = create_app(state)
     server, server_task = await start_uvicorn(
         app,
-        host=os.getenv("OBS_HOST", "0.0.0.0"),
-        port=int(os.getenv("OBS_PORT", "8002")),
+        host=OBS_HOST,
+        port=OBS_PORT,
     )
 
     ml_api = MLPredictService(url=ML_API_URL)

@@ -13,3 +13,5 @@ ML_API_URL = "http://ml-api:8000"
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
 TOPIC_NAME = os.getenv("TOPIC_NAME", "transactions")
 GROUP_ID = os.getenv("GROUP_ID", "transactions-consumer")
+OBS_HOST = os.getenv("OBS_HOST", "0.0.0.0")
+OBS_PORT = int(os.getenv("OBS_PORT", 8001))

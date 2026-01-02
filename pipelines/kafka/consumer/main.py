@@ -1,16 +1,13 @@
-import os
 import time
 import asyncio
 from uuid import UUID
 import json
 from typing import Any, Dict
-from pydantic import BaseModel
-from datetime import datetime
+from dotenv import load_dotenv
 
 from aiokafka import AIOKafkaConsumer
 import structlog
 from pipelines.services.ml_api import MLPredictService
-from pipelines.db.repository import TransactionRepository
 from pipelines.services.batch_ingest import KafkaTransactionIngestService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from pipelines.observability.http_app import (
@@ -25,41 +22,25 @@ from pipelines.config import (
     KAFKA_BOOTSTRAP_SERVERS,
     TOPIC_NAME,
     GROUP_ID,
+    OBS_HOST,
+    OBS_PORT
 )
 from pipelines.logging import setup_logging
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 SessionFactory = async_sessionmaker(engine, expire_on_commit=False)
 
-
-class Transaction(BaseModel):
-    id: UUID
-    description: str
-    amount: float
-    timestamp: datetime
-    merchant: str | None
-    operation_type: str
-    side: str
-
-
 def json_deserializer(data: bytes) -> Dict[str, Any]:
     return json.loads(data.decode("utf-8"))
 
 
-async def handle(
-    ml_api: MLPredictService, repo: TransactionRepository, record: Transaction
-) -> None:
-    pass
-
-
 async def main() -> None:
+    load_dotenv()
     setup_logging("csv-ingest")
     logging = structlog.get_logger().bind(service="kafka")
     state = HealthState(ready=False)
     app = create_app(state)
-    obs_host = os.getenv("OBS_HOST", "0.0.0.0")
-    obs_port = int(os.getenv("OBS_PORT", "8001"))
-    server, server_task = await start_uvicorn(app, obs_host, obs_port)
+    server, server_task = await start_uvicorn(app, OBS_HOST, OBS_PORT)
 
     consumer = AIOKafkaConsumer(
         TOPIC_NAME,
@@ -78,7 +59,7 @@ async def main() -> None:
 
     await consumer.start()
     state.ready = True
-    logging.info(f"Consumer started; /ready=200 on :{obs_port}", port=obs_port)
+    logging.info(f"Consumer started; /ready=200 on :{OBS_PORT}", port=OBS_PORT)
     try:
         while True:
             state.in_progress = True
