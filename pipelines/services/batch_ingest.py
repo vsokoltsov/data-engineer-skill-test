@@ -57,15 +57,14 @@ class AbstractTransactionIngestService(ABC):
                 INGEST_INFLIGHT.labels(source=self.source).set(1)
                 batch_t0 = time.perf_counter()
                 try:
-                    n = len(chunk)
+                    trx = cast(
+                        List[TransactionRequest], chunk.to_dict(orient="records")
+                    )
+                    n = len(trx)
                     self.logging.info("batch_received", batch_size=n, batch_id=batch_id)
                     INGEST_BATCHES_TOTAL.labels(source=self.source).inc()
                     INGEST_ROWS_TOTAL.labels(source=self.source).inc(n)
                     INGEST_LAST_BATCH_SIZE.labels(source=self.source).set(n)
-
-                    trx = cast(
-                        List[TransactionRequest], chunk.to_dict(orient="records")
-                    )
                     # 2. Retrieve predictions for each batch
                     with measure_stage(self.source, "predict"):
                         predictions: List[PredictionResponse] = self.ml_api.predict(trx)
@@ -88,6 +87,7 @@ class AbstractTransactionIngestService(ABC):
                     self.logging.exception(
                         "batch_failed", error=str(e), batch_id=batch_id
                     )
+                    raise
                 finally:
                     dur = time.perf_counter() - batch_t0
                     INGEST_STAGE_DURATION.labels(

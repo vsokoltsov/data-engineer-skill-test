@@ -30,11 +30,6 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 
 @pytest.mark.e2e
 def test_csv_entrypoint_inserts_rows():
-    with psycopg2.connect(PG_DSN) as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE transactions")
-        conn.commit()
-
     trx_file_path = os.path.join(DATA_PATH, "dumb_csv.csv")
     trx_container_path = os.path.join("/app", "data", "dumb_csv.csv")
     trx1_id = 1
@@ -73,6 +68,20 @@ def test_csv_entrypoint_inserts_rows():
         "side",
     ]
     df[cols].to_csv(trx_file_path, sep=";", index=False, decimal=",", quotechar='"')
+    subprocess.check_call([
+        "docker",
+        "compose",
+        "-f",
+        str(COMPOSE_FILE),
+        "up",
+        "-d",
+        "postgres",
+        "ml-api"
+    ])
+    with psycopg2.connect(PG_DSN) as conn:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE transactions")
+        conn.commit()
     subprocess.check_call(
         [
             "docker",
@@ -84,9 +93,9 @@ def test_csv_entrypoint_inserts_rows():
             "-e",
             f"TRXS_PATH={trx_container_path}",
             "csv-ingest",
-            "python",
-            "-m",
-            "pipelines.csv.main",
+            "/bin/bash",
+            "-c",
+            "alembic upgrade head && python -m pipelines.csv.main",
         ]
     )
 
@@ -103,7 +112,7 @@ def test_csv_entrypoint_inserts_rows():
 
         wait_until(
             table_exists,
-            timeout=90,
+            timeout=60,
             err="transactions table not created (alembic not applied)",
         )
 
@@ -129,7 +138,6 @@ def test_csv_entrypoint_inserts_rows():
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("SELECT count(*) AS c FROM transactions")
                     row = cur.fetchone()
-                    print("ROW IS", row)
                     if not row:
                         return False
                     qresult = row.get("c", 0)
