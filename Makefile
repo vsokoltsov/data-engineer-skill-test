@@ -24,3 +24,21 @@ e2e-tests:
 
 test-coverage:
 	uv run pytest -q --cov=pipelines --cov-report=term-missing
+
+csv-ingestion:
+	docker-compose up postgres ml-api csv-ingestion
+
+kafka-consumer:
+	docker-compose up postgres ml-api init-topics register-schemas zookeeper kafka schema-registry console consumer
+
+kafka-producer:
+	docker-compose up init-topics register-schemas zookeeper kafka schema-registry console producer
+
+postgres:
+	docker-compose up postgres pgadmin
+
+kafka:
+	docker-compose up kafka zookeeper schema-registry init-topics register-schemas schema-registry console producer consumer
+
+observability:
+	docker-compose up prometheus grafana loki promtail
