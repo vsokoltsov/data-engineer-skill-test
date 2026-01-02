@@ -16,7 +16,9 @@ class HealthState:
 
 
 def create_app(state: HealthState) -> FastAPI:
-    app = FastAPI(title="observability", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(
+        title="observability", docs_url=None, redoc_url=None, openapi_url=None
+    )
 
     @app.get("/metrics")
     def metrics() -> Response:
@@ -39,13 +41,16 @@ def create_app(state: HealthState) -> FastAPI:
             "last_error": state.last_error,
             "last_run_ts": state.last_run_ts,
         }
-        return Response(content=_json(body), media_type="application/json", status_code=status_code)
+        return Response(
+            content=_json(body), media_type="application/json", status_code=status_code
+        )
 
     return app
 
 
 def _json(obj: dict) -> str:
     import json
+
     return json.dumps(obj, ensure_ascii=False)
 
 

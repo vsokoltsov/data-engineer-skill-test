@@ -16,8 +16,13 @@ from pipelines.services.protocols import MLServiceProtocol
 from pipelines.services.models import TransactionRequest, PredictionResponse
 from pipelines.observability.utils import measure_stage, ameasure_stage
 from pipelines.observability.metrics import (
-    INGEST_BATCHES_TOTAL, INGEST_ROWS_TOTAL, INGEST_ROWS_WRITTEN_TOTAL,
-    INGEST_INFLIGHT, INGEST_LAST_SUCCESS_TS, INGEST_LAST_BATCH_SIZE, INGEST_STAGE_DURATION
+    INGEST_BATCHES_TOTAL,
+    INGEST_ROWS_TOTAL,
+    INGEST_ROWS_WRITTEN_TOTAL,
+    INGEST_INFLIGHT,
+    INGEST_LAST_SUCCESS_TS,
+    INGEST_LAST_BATCH_SIZE,
+    INGEST_STAGE_DURATION,
 )
 import structlog
 
@@ -30,7 +35,6 @@ class AbstractTransactionIngestService(ABC):
 
     def __post_init__(self) -> None:
         self.logging = structlog.get_logger().bind(service="csv-ingest")
-
 
     @abstractmethod
     def read_batches(self, chunk_size: int = 1000) -> AsyncIterator[pd.DataFrame]: ...
@@ -54,19 +58,21 @@ class AbstractTransactionIngestService(ABC):
                 batch_t0 = time.perf_counter()
                 try:
                     n = len(chunk)
-                    self.logging.info("batch_received", batch_size=n)
+                    self.logging.info("batch_received", batch_size=n, batch_id=batch_id)
                     INGEST_BATCHES_TOTAL.labels(source=self.source).inc()
                     INGEST_ROWS_TOTAL.labels(source=self.source).inc(n)
                     INGEST_LAST_BATCH_SIZE.labels(source=self.source).set(n)
 
-                    trx = cast(List[TransactionRequest], chunk.to_dict(orient="records"))
+                    trx = cast(
+                        List[TransactionRequest], chunk.to_dict(orient="records")
+                    )
                     # 2. Retrieve predictions for each batch
                     with measure_stage(self.source, "predict"):
                         predictions: List[PredictionResponse] = self.ml_api.predict(trx)
 
                     with measure_stage(self.source, "merge"):
                         df = merge_predictions(chunk=chunk, predictions=predictions)
-                    
+
                     async with ameasure_stage(self.source, "db_upsert"):
                         affected = await repo.upsert_many(
                             cast(List[Dict[str, Any]], df.to_dict(orient="records"))
@@ -79,12 +85,18 @@ class AbstractTransactionIngestService(ABC):
                     INGEST_ROWS_WRITTEN_TOTAL.labels(source=self.source).inc(affected)
                     INGEST_LAST_SUCCESS_TS.labels(source=self.source).set(time.time())
                 except Exception as e:
-                    self.logging.exception("batch_failed", error=str(e))
+                    self.logging.exception(
+                        "batch_failed", error=str(e), batch_id=batch_id
+                    )
                 finally:
                     dur = time.perf_counter() - batch_t0
-                    INGEST_STAGE_DURATION.labels(source=self.source, stage="batch_total").observe(dur)
+                    INGEST_STAGE_DURATION.labels(
+                        source=self.source, stage="batch_total"
+                    ).observe(dur)
                     INGEST_INFLIGHT.labels(source=self.source).set(0)
-                    self.logging.info("batch_finished", duration_s=dur)
+                    self.logging.info(
+                        "batch_finished", duration_s=dur, batch_id=batch_id
+                    )
 
         self.logging.info("ingest_run_finished", total_rows=total_rows)
         return total_rows

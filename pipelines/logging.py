@@ -5,10 +5,11 @@ import structlog
 
 _CONFIGURED = False
 
+
 def setup_logging(service_name: str) -> None:
     global _CONFIGURED
     if _CONFIGURED:
-        return 
+        return
     level = os.getenv("LOG_LEVEL", "INFO").upper()
 
     logging.basicConfig(
@@ -26,7 +27,9 @@ def setup_logging(service_name: str) -> None:
             structlog.processors.format_exc_info,
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(getattr(logging, level, logging.INFO)),
+        wrapper_class=structlog.make_filtering_bound_logger(
+            getattr(logging, level, logging.INFO)
+        ),
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
     )

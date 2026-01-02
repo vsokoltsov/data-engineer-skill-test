@@ -17,7 +17,7 @@ from pipelines.observability.http_app import (
     HealthState,
     start_uvicorn,
     create_app,
-    stop_uvicorn
+    stop_uvicorn,
 )
 from pipelines.config import (
     DATABASE_URL,

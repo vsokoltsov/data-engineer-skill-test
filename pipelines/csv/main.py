@@ -7,7 +7,12 @@ from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from pipelines.config import DATABASE_URL, TRANSACTIONS_PATH, ML_API_URL
-from pipelines.observability.http_app import HealthState, create_app, start_uvicorn, stop_uvicorn
+from pipelines.observability.http_app import (
+    HealthState,
+    create_app,
+    start_uvicorn,
+    stop_uvicorn,
+)
 from pipelines.logging import setup_logging
 
 engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
