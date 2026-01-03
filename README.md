@@ -447,11 +447,11 @@ BatchQuality --> QualityReport
 
 ## Tests
 
-* There are 3 types of tests in the project:
+* There are 4 types of tests in the project:
   * `Unit` - mock external calls. Marked as `@pytest.mark.unit` in code
   * `Integration` - verify work of database-related elements. Marked as `@pytest.mark.integration` in code
   * `End-to-end` - service + database connection. Marked as `@pytest.mark.e2e` in code
-  * `Functional` - check the whole stack. Marked as `@pytest.mark.functional` in code
+  * `Functional` - check the whole stack, spins up the docker services from `docker-compose`. Marked as `@pytest.mark.functional` in code
 
 ### Test coverage
 
@@ -509,4 +509,3 @@ TOTAL                                     598    214    64%
 
 * Deployment (via [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/) / Kubernetes)
 * [Apache Airflow](https://airflow.apache.org/) (?)
-* Refactor the structure of `run()` method for sending DLQ messages for each of the possible exception
