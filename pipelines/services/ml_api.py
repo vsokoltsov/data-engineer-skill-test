@@ -4,10 +4,13 @@ from urllib.parse import urljoin
 
 import requests
 from typing import List
-
+from pydantic import TypeAdapter, ValidationError
 
 from pipelines.services.backoff import retry_with_backoff
 from pipelines.services.models import TransactionRequest, PredictionResponse
+from pipelines.services.errors import MLAPIServiceError
+
+adapter = TypeAdapter(List[PredictionResponse])
 
 
 @dataclass
@@ -25,5 +28,21 @@ class MLPredictService:
         return requests.post(urljoin(self.url, path), json=json)
 
     def predict(self, trx: List[TransactionRequest]) -> List[PredictionResponse]:
-        response = self._post("predict", json=trx)
-        return response.json()
+        try:
+            response = self._post("predict", json=trx)
+            if response.status_code != 200:
+                raise MLAPIServiceError(
+                    orig=ValueError(f"http status is {response.status_code}")
+                )
+            data = response.json()
+            return adapter.validate_python(data)
+        except ValidationError as e:
+            raise MLAPIServiceError(orig=e)
+        except requests.Timeout as e:
+            raise MLAPIServiceError(orig=e)
+        except requests.ConnectionError:
+            raise MLAPIServiceError(
+                orig=Exception(f"unable to connect to host {self.url}")
+            )
+        except requests.JSONDecodeError as e:
+            raise MLAPIServiceError(orig=e)
