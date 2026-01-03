@@ -29,7 +29,9 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 
 
 @pytest.mark.functional
+@pytest.mark.xdist_group("serial")
 def test_csv_entrypoint_inserts_rows():
+    print("Detached flag", DETACHED)
     trx_file_path = os.path.join(DATA_PATH, "dumb_csv.csv")
     trx_container_path = os.path.join("/app", "data", "dumb_csv.csv")
     trx1_id = 1
@@ -40,7 +42,7 @@ def test_csv_entrypoint_inserts_rows():
         {
             "id": 1,
             "description": "hello",
-            "amount": 10.5,
+            "amount": -10.5,
             "timestamp": "2024-01-01T00:00:00",
             "merchant": None,
             "operation_type": "payment",
@@ -49,7 +51,7 @@ def test_csv_entrypoint_inserts_rows():
         {
             "id": 2,
             "description": "world",
-            "amount": 20.0,
+            "amount": -20.0,
             "timestamp": "2024-01-02T00:00:00",
             "merchant": "Amazon",
             "operation_type": "transfer",
@@ -68,20 +70,24 @@ def test_csv_entrypoint_inserts_rows():
         "side",
     ]
     df[cols].to_csv(trx_file_path, sep=";", index=False, decimal=",", quotechar='"')
-    subprocess.check_call([
-        "docker",
-        "compose",
-        "-f",
-        str(COMPOSE_FILE),
-        "up",
-        "-d",
-        "postgres",
-        "ml-api"
-    ])
-    with psycopg2.connect(PG_DSN) as conn:
-        with conn.cursor() as cur:
-            cur.execute("TRUNCATE TABLE transactions")
-        conn.commit()
+    subprocess.check_call(
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(COMPOSE_FILE),
+            "up",
+            "-d",
+            "postgres",
+            "kafka",
+            "zookeeper",
+            "schema-registry",
+            "init-topics",
+            "register-schemas",
+            "ml-api",
+        ]
+    )
+
     subprocess.check_call(
         [
             "docker",
@@ -95,7 +101,7 @@ def test_csv_entrypoint_inserts_rows():
             "csv-ingest",
             "/bin/bash",
             "-c",
-            "alembic upgrade head && python -m pipelines.csv.main",
+            "alembic upgrade head && python -m pipelines.scripts.csv",
         ]
     )
 
@@ -119,14 +125,14 @@ def test_csv_entrypoint_inserts_rows():
         expected = {
             str(trx1_uuid): {
                 "description": "hello",
-                "amount": 10.5,
+                "amount": -10.5,
                 "merchant": None,
                 "operation_type": "payment",
                 "side": "debit",
             },
             str(trx2_uuid): {
                 "description": "world",
-                "amount": 20.0,
+                "amount": -20.0,
                 "merchant": "Amazon",
                 "operation_type": "transfer",
                 "side": "debit",

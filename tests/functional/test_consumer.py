@@ -29,6 +29,7 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 
 
 @pytest.mark.functional
+@pytest.mark.xdist_group("serial")
 def test_consumer_entrypoint_inserts_rows():
     subprocess.check_call(
         [
@@ -91,14 +92,14 @@ def test_consumer_entrypoint_inserts_rows():
                 "amount": 10.5,
                 "merchant": "EDF",
                 "operation_type": "payment",
-                "side": "debit",
+                "side": "credit",
             },
             str(trx2_id): {
                 "description": "world",
                 "amount": 20.0,
                 "merchant": "Amazon",
                 "operation_type": "transfer",
-                "side": "debit",
+                "side": "credit",
             },
         }
         payloads = [
@@ -109,7 +110,7 @@ def test_consumer_entrypoint_inserts_rows():
                 "timestamp": "2024-01-01T00:00:00",
                 "merchant": "EDF",
                 "operation_type": "payment",
-                "side": "debit",
+                "side": "credit",
             },
             {
                 "id": str(trx2_id),
@@ -118,14 +119,12 @@ def test_consumer_entrypoint_inserts_rows():
                 "timestamp": "2024-01-02T00:00:00",
                 "merchant": "Amazon",
                 "operation_type": "transfer",
-                "side": "debit",
+                "side": "credit",
             },
         ]
 
         for msg in payloads:
-            producer.send(
-                TOPIC, value=json.dumps(msg).encode("utf-8")
-            )  # <-- см. ниже про JSON
+            producer.send(TOPIC, value=json.dumps(msg).encode("utf-8"))
         producer.flush()
 
         def rows_inserted():
