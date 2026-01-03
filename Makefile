@@ -5,13 +5,13 @@ mypy:
 	uv run mypy pipelines/ tests/
 
 black:
-	black --check pipelines/ tests/
+	uv run black --check pipelines/ tests/
 
 black-fix:
-	black pipelines/ tests/
+	uv run black pipelines/ tests/
 
 ruff:
-	ruff check pipelines/ tests/ --fix
+	uv run ruff check pipelines/ tests/ --fix
 
 lint:
 	make mypy & make black-fix & make ruff

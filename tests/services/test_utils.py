@@ -1,7 +1,6 @@
 import pytest
 import pandas as pd
 from uuid import uuid4
-from datetime import datetime
 
 from pipelines.services.utils import merge_predictions
 from pipelines.services.models import PredictionResponse
@@ -250,8 +249,6 @@ class TestMergePredictions:
                 "side": ["debit"],
             }
         )
-
-        original_chunk = chunk.copy()
 
         predictions = [
             PredictionResponse(transaction_id=id1, category="Food"),
