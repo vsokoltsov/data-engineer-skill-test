@@ -62,8 +62,11 @@ class AbstractTransactionIngestService(ABC):
                 batch_id = str(uuid.uuid4())
                 INGEST_INFLIGHT.labels(source=self.source).set(1)
                 batch_t0 = time.perf_counter()
+                current_chunk = chunk
+                current_stage = "read"
                 try:
                     # Validate batch
+                    current_stage = "validate"
                     trx_checked = TransactionValidator.validate_rows(rows=chunk)
                     if len(trx_checked["dlqs"]) > 0:
                         self.logging.error(
@@ -78,15 +81,15 @@ class AbstractTransactionIngestService(ABC):
                                 batch_id=batch_id,
                                 err=row["validation_error"],
                             )
-                            await self.dlq.publish(
-                                original=row,
-                                err=row["validation_error"],
-                                stage="chunk_validation",
-                                source=self.source,
-                                topic="transactions",
+                            await self._send_chunk_to_dlq(
+                                chunk=current_chunk,
+                                error=ValueError(row["validation_error"]),
+                                stage=current_stage,
+                                batch_id=batch_id,
                             )
 
                     # Verify quality of data
+                    current_stage = "quality_check"
                     report = self.quality_service.verify(df=trx_checked["valid"])
                     if report.issues_rate > self.quality_service.threshold:
                         self.logging.error(
@@ -111,19 +114,28 @@ class AbstractTransactionIngestService(ABC):
                     INGEST_ROWS_TOTAL.labels(source=self.source).inc(n)
                     INGEST_LAST_BATCH_SIZE.labels(source=self.source).set(n)
                     # 2. Retrieve predictions for each batch
+                    current_stage = "predict"
                     with measure_stage(self.source, "predict"):
                         predictions: List[PredictionResponse] = self.ml_api.predict(trx)
 
+                    current_stage = "merge"
                     with measure_stage(self.source, "merge"):
+                        self.logging.exception("wrong_prediction",
+                            predictions=predictions,
+                            type_predictions=type(predictions[0]),
+                            pands_predictions=pd.DataFrame(predictions)
+                        )
                         df = merge_predictions(
                             chunk=trx_checked["valid"], predictions=predictions
                         )
 
+                    current_stage = "db_upsert"
                     async with ameasure_stage(self.source, "db_upsert"):
                         affected = await repo.upsert_many(
                             cast(List[Dict[str, Any]], df.to_dict(orient="records"))
                         )
                     # 3. Save transaction data + predicted category to database
+                    current_stage = "commit"
                     async with ameasure_stage(self.source, "commit"):
                         await session.commit()
 
@@ -137,13 +149,31 @@ class AbstractTransactionIngestService(ABC):
                         params=e.params,
                         orig=repr(e.orig),
                     )
+                    await self._send_chunk_to_dlq(
+                        chunk=current_chunk,
+                        error=e,
+                        stage=current_stage,
+                        batch_id=batch_id,
+                    )
                     raise
                 except MLAPIServiceError as e:
                     self.logging.exception("ml_api_service_error", orig=repr(e.orig))
+                    await self._send_chunk_to_dlq(
+                        chunk=current_chunk,
+                        error=e,
+                        stage=current_stage,
+                        batch_id=batch_id,
+                    )
                     raise
                 except Exception as e:
                     self.logging.exception(
                         "batch_failed", error=str(e), batch_id=batch_id
+                    )
+                    await self._send_chunk_to_dlq(
+                        chunk=current_chunk,
+                        error=e,
+                        stage=current_stage,
+                        batch_id=batch_id,
                     )
                     raise
                 finally:
@@ -158,6 +188,40 @@ class AbstractTransactionIngestService(ABC):
 
         self.logging.info("ingest_run_finished", total_rows=total_rows)
         return total_rows
+
+    async def _send_chunk_to_dlq(
+        self,
+        chunk: pd.DataFrame,
+        error: Exception,
+        stage: str,
+        batch_id: str,
+    ) -> None:
+        """Helper method to send all records from a chunk to DLQ."""
+        try:
+            records = chunk.to_dict(orient="records")
+            for record in records:
+                await self.dlq.publish(
+                    original=record,
+                    err=error,
+                    stage=stage,
+                    source=self.source,
+                    topic="transactions",
+                )
+            self.logging.info(
+                "chunk_sent_to_dlq",
+                batch_id=batch_id,
+                stage=stage,
+                records_count=len(records),
+                error_type=type(error).__name__,
+            )
+        except Exception as dlq_error:
+            # If DLQ publishing fails, log but don't raise to avoid masking original error
+            self.logging.exception(
+                "dlq_publish_failed",
+                batch_id=batch_id,
+                original_error=str(error),
+                dlq_error=str(dlq_error),
+            )
 
 
 @dataclass
