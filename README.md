@@ -63,6 +63,8 @@ a transaction, will return a category based on it's hashed id.
 
 # Report
 
+[![CI](https://github.com/vsokoltsov/data-engineer-skill-test/actions/workflows/ci.yml/badge.svg)](https://github.com/vsokoltsov/data-engineer-skill-test//actions/workflows/ci.yml)
+
 ## Requirements
 
 In order to run the project, it is necessary to install
