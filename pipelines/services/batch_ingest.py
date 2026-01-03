@@ -120,10 +120,11 @@ class AbstractTransactionIngestService(ABC):
 
                     current_stage = "merge"
                     with measure_stage(self.source, "merge"):
-                        self.logging.exception("wrong_prediction",
+                        self.logging.exception(
+                            "wrong_prediction",
                             predictions=predictions,
                             type_predictions=type(predictions[0]),
-                            pands_predictions=pd.DataFrame(predictions)
+                            pands_predictions=pd.DataFrame(predictions),
                         )
                         df = merge_predictions(
                             chunk=trx_checked["valid"], predictions=predictions

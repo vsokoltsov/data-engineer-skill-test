@@ -10,10 +10,7 @@ def merge_predictions(
     chunk: pd.DataFrame, predictions: List[PredictionResponse]
 ) -> pd.DataFrame:
     df = chunk.copy()
-    pred_map = {
-        str(p.transaction_id): p.category
-        for p in predictions
-    }
+    pred_map = {str(p.transaction_id): p.category for p in predictions}
 
     df["category"] = df["id"].map(pred_map)
     # Convert to object dtype and replace NaN/NA with None
