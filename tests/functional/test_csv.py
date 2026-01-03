@@ -31,7 +31,6 @@ def wait_until(predicate, timeout=30, interval=0.5, err="timeout"):
 @pytest.mark.functional
 @pytest.mark.xdist_group("serial")
 def test_csv_entrypoint_inserts_rows():
-    print("Detached flag", DETACHED)
     trx_file_path = os.path.join(DATA_PATH, "dumb_csv.csv")
     trx_container_path = os.path.join("/app", "data", "dumb_csv.csv")
     trx1_id = 1
