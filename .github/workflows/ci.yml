@@ -49,7 +49,7 @@ jobs:
         run: make ruff
 
   tests:
-    name: Tests (unit/integration/e2e)
+    name: Tests
     runs-on: ubuntu-latest
     needs: lint
 

@@ -7,6 +7,7 @@ import pytest
 import pytest_asyncio
 import httpx
 from testcontainers.postgres import PostgresContainer
+from pydantic import TypeAdapter
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from aiokafka import AIOKafkaProducer
@@ -17,6 +18,8 @@ from pipelines.services.models import TransactionRequest, PredictionResponse
 from pipelines.db.models import Base, Transaction
 from pipelines.services.quality import BatchQuality
 from pipelines.kafka.producers.dlq import DLQPublisher
+
+adapter = TypeAdapter(List[PredictionResponse])
 
 try:
     from testcontainers.kafka import KafkaContainer
@@ -109,7 +112,8 @@ async def test_csv_ingest_service_inserts_rows(
         def predict(self, trx: List[TransactionRequest]) -> List[PredictionResponse]:
             r = self.client.post("/predict", json=trx)
             r.raise_for_status()
-            return r.json()
+            data = r.json()
+            return adapter.validate_python(data)
 
     ml_api = HttpxMLPredictService(fake_ml_api_server)
 

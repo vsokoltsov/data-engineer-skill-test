@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 import httpx
 from testcontainers.postgres import PostgresContainer
-
+from pydantic import TypeAdapter
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
@@ -16,6 +16,8 @@ from pipelines.services.models import TransactionRequest, PredictionResponse
 from pipelines.db.models import Base, Transaction
 from pipelines.kafka.producers.dlq import DLQPublisher
 from pipelines.services.quality import BatchQuality
+
+adapter = TypeAdapter(List[PredictionResponse])
 
 try:
     from testcontainers.kafka import KafkaContainer
@@ -78,7 +80,8 @@ class HttpxMLPredictService:
     def predict(self, trx: List[TransactionRequest]) -> List[PredictionResponse]:
         r = self.client.post("/predict", json=trx)
         r.raise_for_status()
-        return r.json()
+        data = r.json()
+        return adapter.validate_python(data)
 
 
 @pytest_asyncio.fixture
@@ -92,7 +95,7 @@ async def dlq_publisher(kafka_bootstrap: str):
     try:
         dlq = DLQPublisher(
             producer=producer,
-            dlq_topic="dlqs",  # or whatever your DLQ topic is
+            dlq_topic="dlqs",
             service="test",
         )
         yield dlq
