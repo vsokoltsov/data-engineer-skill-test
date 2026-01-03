@@ -220,7 +220,7 @@ class TestAbstractTransactionIngestService:
         dlq.publish.assert_awaited_with(
             original=dlqs_df.iloc[0].to_dict(),
             err="amount and side mismatch",
-            stage="chunk_validation",
+            stage="validate",
             source="test",
             topic="transactions",
         )

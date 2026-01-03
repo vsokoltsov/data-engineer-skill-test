@@ -81,12 +81,14 @@ class AbstractTransactionIngestService(ABC):
                                 batch_id=batch_id,
                                 err=row["validation_error"],
                             )
-                            await self._send_chunk_to_dlq(
-                                chunk=current_chunk,
-                                error=ValueError(row["validation_error"]),
+                            await self.dlq.publish(
+                                original=row,
+                                err=row["validation_error"],
                                 stage=current_stage,
-                                batch_id=batch_id,
+                                source=self.source,
+                                topic="transactions",
                             )
+                            
 
                     # Verify quality of data
                     current_stage = "quality_check"
@@ -120,12 +122,6 @@ class AbstractTransactionIngestService(ABC):
 
                     current_stage = "merge"
                     with measure_stage(self.source, "merge"):
-                        self.logging.exception(
-                            "wrong_prediction",
-                            predictions=predictions,
-                            type_predictions=type(predictions[0]),
-                            pands_predictions=pd.DataFrame(predictions),
-                        )
                         df = merge_predictions(
                             chunk=trx_checked["valid"], predictions=predictions
                         )
