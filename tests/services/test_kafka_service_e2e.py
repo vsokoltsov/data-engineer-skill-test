@@ -1,4 +1,3 @@
-# tests/e2e/test_kafka_ingest_service.py
 import json
 from typing import Iterator, List
 from sqlalchemy import select, func
@@ -15,9 +14,9 @@ from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
 from pipelines.services.batch_ingest import KafkaTransactionIngestService
 from pipelines.services.models import TransactionRequest, PredictionResponse
 from pipelines.db.models import Base, Transaction
+from pipelines.kafka.producers.dlq import DLQPublisher
+from pipelines.services.quality import BatchQuality
 
-
-# ---- Kafka container (вариант 1: testcontainers.kafka) ----
 try:
     from testcontainers.kafka import KafkaContainer
 except Exception:
@@ -82,12 +81,29 @@ class HttpxMLPredictService:
         return r.json()
 
 
+@pytest_asyncio.fixture
+async def dlq_publisher(kafka_bootstrap: str):
+    """Create a real DLQPublisher for e2e tests."""
+    producer = AIOKafkaProducer(
+        bootstrap_servers=kafka_bootstrap,
+        value_serializer=lambda x: json.dumps(x).encode("utf-8"),
+    )
+    await producer.start()
+    try:
+        dlq = DLQPublisher(
+            producer=producer,
+            dlq_topic="dlqs",  # or whatever your DLQ topic is
+            service="test",
+        )
+        yield dlq
+    finally:
+        await producer.stop()
+
+
 @pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_kafka_ingest_service_inserts_rows(
-    session_factory,
-    fake_ml_api_server,
-    kafka_bootstrap: str,
+    session_factory, fake_ml_api_server, kafka_bootstrap: str, dlq_publisher
 ):
     topic = "transactions"
 
@@ -103,7 +119,7 @@ async def test_kafka_ingest_service_inserts_rows(
             {
                 "id": "00000000-0000-0000-0000-000000000001",
                 "description": "hello",
-                "amount": 10.5,
+                "amount": -10.5,
                 "timestamp": "2024-01-01T00:00:00",
                 "merchant": None,
                 "operation_type": "payment",
@@ -115,7 +131,7 @@ async def test_kafka_ingest_service_inserts_rows(
             {
                 "id": "00000000-0000-0000-0000-000000000002",
                 "description": "world",
-                "amount": 20.0,
+                "amount": -20.0,
                 "timestamp": "2024-01-02T00:00:00",
                 "merchant": "Amazon",
                 "operation_type": "transfer",
@@ -142,6 +158,8 @@ async def test_kafka_ingest_service_inserts_rows(
             session_factory=session_factory,
             ml_api=ml_api,
             consumer=consumer,
+            quality_service=BatchQuality(threshold=0.1),
+            dlq=dlq_publisher,
         )
 
         affected = await svc.run()
