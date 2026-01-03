@@ -1,3 +1,6 @@
+install-kernel:
+	uv run python -m ipykernel install --user --name=de-skill-test --display-name="Data Engineer Skill Test"
+
 mypy:
 	uv run mypy pipelines/ tests/
 
@@ -22,11 +25,14 @@ integration-tests:
 e2e-tests:
 	uv run pytest -m e2e
 
+functional-tests:
+	uv run pytest -m functional
+
 test-coverage:
 	uv run pytest -q --cov=pipelines --cov-report=term-missing -m "not functional"
 
 csv-ingestion:
-	docker-compose up postgres ml-api csv-ingestion
+	docker-compose up postgres ml-api csv-ingest init-topics register-schemas zookeeper kafka schema-registry console
 
 kafka-consumer:
 	docker-compose up postgres ml-api init-topics register-schemas zookeeper kafka schema-registry console consumer
