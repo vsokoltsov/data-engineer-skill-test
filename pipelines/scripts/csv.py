@@ -1,17 +1,21 @@
-import os
 import asyncio
 import time
 import structlog
+from aiokafka import AIOKafkaProducer
 from pipelines.csv.reader import CSVReader
 from pipelines.services.batch_ingest import CSVTransactionIngestService
 from pipelines.services.ml_api import MLPredictService
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from pipelines.kafka.producers.dlq import DLQPublisher
 from pipelines.config import (
     DATABASE_URL,
     TRANSACTIONS_PATH,
     ML_API_URL,
     OBS_HOST,
-    OBS_PORT
+    OBS_PORT,
+    QUALITY_THRESHOLD,
+    DLQ_TOPIC,
+    KAFKA_BOOTSTRAP_SERVERS,
 )
 from pipelines.observability.http_app import (
     HealthState,
@@ -19,6 +23,7 @@ from pipelines.observability.http_app import (
     start_uvicorn,
     stop_uvicorn,
 )
+from pipelines.services.quality import BatchQuality
 from pipelines.logging import setup_logging
 from dotenv import load_dotenv
 
@@ -38,7 +43,10 @@ async def main():
         host=OBS_HOST,
         port=OBS_PORT,
     )
-
+    producer = AIOKafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS)
+    await producer.start()
+    dlq = DLQPublisher(producer=producer, dlq_topic=DLQ_TOPIC, service="csv")
+    quality_service = BatchQuality(QUALITY_THRESHOLD)
     ml_api = MLPredictService(url=ML_API_URL)
     reader = CSVReader(file_path=TRANSACTIONS_PATH)
     engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
@@ -47,6 +55,8 @@ async def main():
         session_factory=session_factory,
         ml_api=ml_api,
         csv_reader=reader,
+        quality_service=quality_service,
+        dlq=dlq,
     )
 
     try:
@@ -65,6 +75,7 @@ async def main():
         state.ready = False
         await asyncio.sleep(15)
         await engine.dispose()
+        await producer.stop()
         logging.info("csv-ingestion finished execution")
         await stop_uvicorn(server, server_task)
 

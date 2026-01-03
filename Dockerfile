@@ -22,11 +22,11 @@ FROM app AS csv_ingest
 COPY data/ /app/data/
 ENV CSV_PATH=/app/data/transactions_fr.csv
 
-CMD ["python", "-m", "pipelines.csv.main"]
+CMD ["python", "-m", "pipelines.scripts.csv"]
 
 FROM app AS producer
-CMD ["python", "-m", "pipelines.kafka.producer.main"]
+CMD ["python", "-m", "pipelines.scripts.kafka.producer"]
 
 
 FROM app AS consumer
-CMD ["python", "-m", "pipelines.kafka.consumer.main"]
+CMD ["python", "-m", "pipelines.scripts.kafka.consumer"]
