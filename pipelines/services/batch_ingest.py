@@ -88,7 +88,6 @@ class AbstractTransactionIngestService(ABC):
                                 source=self.source,
                                 topic="transactions",
                             )
-                            
 
                     # Verify quality of data
                     current_stage = "quality_check"
