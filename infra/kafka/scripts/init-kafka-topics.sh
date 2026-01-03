@@ -21,4 +21,10 @@ kafka-topics --bootstrap-server "$BOOTSTRAP" --create \
   --partitions 1 --replication-factor 1 \
   --if-not-exists
 
+kafka-topics --bootstrap-server "$BOOTSTRAP" \
+  --create --if-not-exists \
+  --topic dlqs \
+  --partitions 3 \
+  --replication-factor 1
+
 echo "Done."

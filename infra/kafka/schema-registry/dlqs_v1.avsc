@@ -1,0 +1,30 @@
+{
+  "type": "record",
+  "name": "DLQS",
+  "namespace": "qonto.ingest",
+  "fields": [
+    { "name": "topic", "type": "string" },
+    { "name": "partition", "type": ["null", "int"], "default": null },
+    { "name": "offset", "type": ["null", "long"], "default": null },
+
+    { "name": "failed_at", "type": "string" },
+    { "name": "service", "type": "string" },
+    { "name": "source", "type": "string" },
+
+    { "name": "stage", "type": "string" },
+    { "name": "error_type", "type": "string" },
+    { "name": "error_message", "type": "string" },
+
+    {
+      "name": "payload_json",
+      "type": "string",
+      "doc": "Original message as JSON string"
+    },
+
+    {
+      "name": "headers_json",
+      "type": ["null", "string"],
+      "default": null
+    }
+  ]
+}

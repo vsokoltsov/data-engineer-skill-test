@@ -19,3 +19,10 @@ curl -sSf -X POST \
   "http://schema-registry:8081/subjects/$SUBJECT/versions" > /dev/null
 
 echo "Schema registered."
+
+SCHEMA_ESCAPED=$(tr -d '\n' < "$SCHEMA_FILE" | sed 's/"/\\"/g')
+
+curl -s -X POST \
+  -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+  --data "{\"schema\":\"$SCHEMA_ESCAPED\"}" \
+  http://schema-registry:8081/subjects/dlqs-value/versions
