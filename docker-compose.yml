@@ -159,6 +159,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./infra/kafka/schema-registry/transactions_v1.avsc:/schemas/transactions_v1.avsc:ro
+      - ./infra/kafka/schema-registry/dlqs_v1.avsc:/schemas/dlqs_v1.avsc:ro
       - ./infra/kafka/scripts/register-schemas.sh:/scripts/register-schemas.sh:ro
     entrypoint: ["/bin/sh", "/scripts/register-schemas.sh"]
     networks:
@@ -178,7 +179,7 @@ services:
       - ./pipelines:/app/pipelines
       - ./data:/app/data
       - ./alembic.ini:/app/alembic.ini
-    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.kafka.producer.main"]
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.scripts.kafka.producer"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -201,7 +202,7 @@ services:
     volumes:
       - ./pipelines:/app/pipelines
       - ./alembic.ini:/app/alembic.ini
-    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.kafka.consumer.main"]
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.scripts.kafka.consumer"]
     networks:
       - ml-network
     depends_on:
@@ -232,11 +233,14 @@ services:
       target: app
     environment:
       OBS_PORT: "8002"
+      DLQ_TOPIC: "dlqs"
+      SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
     volumes:
       - ./data:/app/data
       - ./pipelines:/app/pipelines
       - ./alembic.ini:/app/alembic.ini
-    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.csv.main"]
+    command: ["/bin/bash", "-c", "alembic upgrade head && python -m pipelines.scripts.csv"]
     networks:
       - ml-network
     depends_on:
@@ -246,6 +250,12 @@ services:
         condition: service_healthy
       prometheus:
         condition: service_started
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+      register-schemas:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
