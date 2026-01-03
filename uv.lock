@@ -2013,7 +2013,7 @@ wheels = [
 ]
 
 [[package]]
-name = "qonto-data-engineer"
+name = "data-engineer-skill-test"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

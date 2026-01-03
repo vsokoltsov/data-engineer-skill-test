@@ -1,7 +1,7 @@
 {
   "type": "record",
   "name": "DLQS",
-  "namespace": "qonto.ingest",
+  "namespace": "com.example",
   "fields": [
     { "name": "topic", "type": "string" },
     { "name": "partition", "type": ["null", "int"], "default": null },

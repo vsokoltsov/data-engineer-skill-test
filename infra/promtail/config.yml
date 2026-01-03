@@ -19,7 +19,7 @@ scrape_configs:
         target_label: container
 
       - source_labels: [__meta_docker_container_name]
-        regex: '/qonto-data-engineer-(.+?)-\d+'
+        regex: '/data-engineer-skill-test-(.+?)-\d+'
         target_label: service
         replacement: '$1'
 
