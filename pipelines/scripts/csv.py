@@ -57,6 +57,8 @@ async def main():
         csv_reader=reader,
         quality_service=quality_service,
         dlq=dlq,
+        stop_on_error=True,
+        max_consecutive_failures=1,
     )
 
     try:

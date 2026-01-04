@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import asyncio
 import uuid
 import time
 import pandas as pd
@@ -36,9 +37,12 @@ import structlog
 class AbstractTransactionIngestService(ABC):
     session_factory: async_sessionmaker[AsyncSession]
     ml_api: MLServiceProtocol
-    logging: structlog.BoundLogger = field(init=False, repr=False)
     quality_service: BatchQuality
     dlq: DLQPublisher
+    stop_on_error: bool = True
+    max_consecutive_failures: int = 3
+    backoff_on_failure_s: float = 0.0
+    logging: structlog.BoundLogger = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.logging = structlog.get_logger().bind(service="csv-ingest")
@@ -53,6 +57,7 @@ class AbstractTransactionIngestService(ABC):
     async def run(self) -> int:
         # Run pipeline
         total_rows = 0
+        consecutive_failures = 0
 
         async with self.session_factory() as session:
             repo = TransactionRepository(session=session)
@@ -88,7 +93,7 @@ class AbstractTransactionIngestService(ABC):
                                 source=self.source,
                                 topic="transactions",
                             )
-
+                    current_chunk = trx_checked["valid"]
                     # Verify quality of data
                     current_stage = "quality_check"
                     report = self.quality_service.verify(df=trx_checked["valid"])
@@ -138,40 +143,54 @@ class AbstractTransactionIngestService(ABC):
                     total_rows += affected
                     INGEST_ROWS_WRITTEN_TOTAL.labels(source=self.source).inc(affected)
                     INGEST_LAST_SUCCESS_TS.labels(source=self.source).set(time.time())
-                except DBAPIError as e:
-                    self.logging.exception(
-                        "db_upsert_error",
-                        statement=e.statement,
-                        params=e.params,
-                        orig=repr(e.orig),
-                    )
-                    await self._send_chunk_to_dlq(
-                        chunk=current_chunk,
-                        error=e,
-                        stage=current_stage,
-                        batch_id=batch_id,
-                    )
-                    raise
-                except MLAPIServiceError as e:
-                    self.logging.exception("ml_api_service_error", orig=repr(e.orig))
-                    await self._send_chunk_to_dlq(
-                        chunk=current_chunk,
-                        error=e,
-                        stage=current_stage,
-                        batch_id=batch_id,
-                    )
-                    raise
+                    consecutive_failures = 0
                 except Exception as e:
-                    self.logging.exception(
-                        "batch_failed", error=str(e), batch_id=batch_id
-                    )
+                    consecutive_failures += 1
+
+                    if isinstance(e, DBAPIError):
+                        self.logging.exception(
+                            "db_upsert_error",
+                            statement=getattr(e, "statement", None),
+                            params=getattr(e, "params", None),
+                            orig=repr(getattr(e, "orig", None)),
+                            batch_id=batch_id,
+                            stage=current_stage,
+                        )
+                    elif isinstance(e, MLAPIServiceError):
+                        self.logging.exception(
+                            "ml_api_service_error",
+                            orig=repr(e.orig),
+                            batch_id=batch_id,
+                            stage=current_stage,
+                        )
+                    else:
+                        self.logging.exception(
+                            "batch_failed",
+                            error=str(e),
+                            batch_id=batch_id,
+                            stage=current_stage,
+                        )
+
                     await self._send_chunk_to_dlq(
                         chunk=current_chunk,
                         error=e,
                         stage=current_stage,
                         batch_id=batch_id,
                     )
-                    raise
+
+                    try:
+                        await session.rollback()
+                    except Exception:
+                        self.logging.exception(
+                            "session_rollback_failed", batch_id=batch_id
+                        )
+
+                    if self.backoff_on_failure_s > 0:
+                        await asyncio.sleep(self.backoff_on_failure_s)
+
+                    if self._should_stop(e, current_stage, consecutive_failures):
+                        raise
+                    continue
                 finally:
                     dur = time.perf_counter() - batch_t0
                     INGEST_STAGE_DURATION.labels(
@@ -219,10 +238,38 @@ class AbstractTransactionIngestService(ABC):
                 dlq_error=str(dlq_error),
             )
 
+    def _is_db_data_error(self, e: DBAPIError) -> bool:
+        orig = e.orig
+        name = orig.__class__.__name__ if orig else ""
+        msg = str(orig) if orig else str(e)
+
+        data_markers = (
+            "invalid input",
+            "DataError",
+            "cannot cast",
+            "value too long",
+            "numeric field overflow",
+        )
+        return ("DataError" in name) or any(m in msg for m in data_markers)
+
+    def _should_stop(self, e: Exception, stage: str, consecutive_failures: int) -> bool:
+        if consecutive_failures >= self.max_consecutive_failures:
+            return True
+
+        if isinstance(e, DBAPIError):
+            if self._is_db_data_error(e):
+                return False
+            return True
+
+        if isinstance(e, MLAPIServiceError):
+            return self.stop_on_error
+
+        return self.stop_on_error
+
 
 @dataclass
 class CSVTransactionIngestService(AbstractTransactionIngestService):
-    csv_reader: CSVReader
+    csv_reader: CSVReader = field(default=...)  # type: ignore[assignment]
 
     @property
     def source(self) -> str:
@@ -235,7 +282,7 @@ class CSVTransactionIngestService(AbstractTransactionIngestService):
 
 @dataclass
 class KafkaTransactionIngestService(AbstractTransactionIngestService):
-    consumer: AIOKafkaConsumer
+    consumer: AIOKafkaConsumer = field(default=...)  # type: ignore[assignment]
 
     @property
     def source(self) -> str:

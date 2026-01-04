@@ -68,6 +68,9 @@ async def main() -> None:
         consumer=consumer,
         quality_service=quality_service,
         dlq=dlq,
+        stop_on_error=False,
+        max_consecutive_failures=10,
+        backoff_on_failure_s=1.0,
     )
 
     await consumer.start()
