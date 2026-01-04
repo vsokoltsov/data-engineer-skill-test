@@ -6,7 +6,7 @@ import pandas as pd
 from sqlalchemy.exc import DBAPIError
 from aiokafka import AIOKafkaConsumer
 from aiokafka.structs import ConsumerRecord, TopicPartition
-from typing import List, Dict, Any, cast, AsyncIterator
+from typing import List, Dict, Any, cast, AsyncIterator, Tuple
 from dataclasses import dataclass, field
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.asyncio.session import AsyncSession
@@ -145,50 +145,16 @@ class AbstractTransactionIngestService(ABC):
                     INGEST_LAST_SUCCESS_TS.labels(source=self.source).set(time.time())
                     consecutive_failures = 0
                 except Exception as e:
-                    consecutive_failures += 1
-
-                    if isinstance(e, DBAPIError):
-                        self.logging.exception(
-                            "db_upsert_error",
-                            statement=getattr(e, "statement", None),
-                            params=getattr(e, "params", None),
-                            orig=repr(getattr(e, "orig", None)),
-                            batch_id=batch_id,
-                            stage=current_stage,
-                        )
-                    elif isinstance(e, MLAPIServiceError):
-                        self.logging.exception(
-                            "ml_api_service_error",
-                            orig=repr(e.orig),
-                            batch_id=batch_id,
-                            stage=current_stage,
-                        )
-                    else:
-                        self.logging.exception(
-                            "batch_failed",
-                            error=str(e),
-                            batch_id=batch_id,
-                            stage=current_stage,
-                        )
-
-                    await self._send_chunk_to_dlq(
-                        chunk=current_chunk,
-                        error=e,
-                        stage=current_stage,
+                    consecutive_failures, should_raise = await self._handle_exception(
+                        e=e,
+                        current_chunk=current_chunk,
+                        current_stage=current_stage,
                         batch_id=batch_id,
+                        session=session,
+                        consecutive_failures=consecutive_failures,
                     )
 
-                    try:
-                        await session.rollback()
-                    except Exception:
-                        self.logging.exception(
-                            "session_rollback_failed", batch_id=batch_id
-                        )
-
-                    if self.backoff_on_failure_s > 0:
-                        await asyncio.sleep(self.backoff_on_failure_s)
-
-                    if self._should_stop(e, current_stage, consecutive_failures):
+                    if should_raise:
                         raise
                     continue
                 finally:
@@ -265,6 +231,65 @@ class AbstractTransactionIngestService(ABC):
             return self.stop_on_error
 
         return self.stop_on_error
+
+    async def _handle_exception(
+        self,
+        e: Exception,
+        current_chunk: pd.DataFrame,
+        current_stage: str,
+        batch_id: str,
+        session: AsyncSession,
+        consecutive_failures: int,
+    ) -> Tuple[int, bool]:
+        """
+        Handle exception during batch processing.
+
+        Returns:
+            tuple[int, bool]: (updated_consecutive_failures, should_raise)
+        """
+        consecutive_failures += 1
+
+        if isinstance(e, DBAPIError):
+            self.logging.exception(
+                "db_upsert_error",
+                statement=getattr(e, "statement", None),
+                params=getattr(e, "params", None),
+                orig=repr(getattr(e, "orig", None)),
+                batch_id=batch_id,
+                stage=current_stage,
+            )
+        elif isinstance(e, MLAPIServiceError):
+            self.logging.exception(
+                "ml_api_service_error",
+                orig=repr(e.orig),
+                batch_id=batch_id,
+                stage=current_stage,
+            )
+        else:
+            self.logging.exception(
+                "batch_failed",
+                error=str(e),
+                batch_id=batch_id,
+                stage=current_stage,
+            )
+
+        await self._send_chunk_to_dlq(
+            chunk=current_chunk,
+            error=e,
+            stage=current_stage,
+            batch_id=batch_id,
+        )
+
+        try:
+            await session.rollback()
+        except Exception:
+            self.logging.exception("session_rollback_failed", batch_id=batch_id)
+
+        if self.backoff_on_failure_s > 0:
+            await asyncio.sleep(self.backoff_on_failure_s)
+
+        should_raise = self._should_stop(e, current_stage, consecutive_failures)
+        return consecutive_failures, should_raise
 
 
 @dataclass
