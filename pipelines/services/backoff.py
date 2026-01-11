@@ -34,12 +34,10 @@ def retry_with_backoff(
                 try:
                     resp = fn(*args, **kwargs)
 
-                    # retry по статусам
                     if resp.status_code in retry_statuses_set:
                         if attempt == max_retries:
                             resp.raise_for_status()
 
-                        # если есть Retry-After — используем
                         retry_after = resp.headers.get("Retry-After")
                         sleep_s: float | None = None
                         if retry_after:

@@ -56,13 +56,12 @@ class DLQPublisher:
             "stage": stage,  # "validate" / "predict" / "db_upsert" / ...
             "error_type": type(err).__name__,
             "error_message": str(err),
-            "payload": original,  # оставляем объектом — сериализуем ниже
-            "headers": headers or {},  # то же самое
+            "payload": original,
+            "headers": headers or {},
         }
 
         value = _json_bytes(event)
 
-        # key в Kafka тоже bytes (если хочешь, чтобы все ошибки одной транзакции шли в одну партицию)
         if isinstance(key, str):
             key_b = key.encode("utf-8")
         elif isinstance(key, (bytes, bytearray)):
